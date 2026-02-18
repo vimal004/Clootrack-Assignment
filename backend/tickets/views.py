@@ -27,3 +27,28 @@ class TicketViewSet(viewsets.ModelViewSet):
             queryset = queryset.filter(title__icontains=search) | queryset.filter(description__icontains=search)
 
         return queryset
+
+    @action(detail=False, methods=['get'])
+    def stats(self, request):
+        total_tickets = Ticket.objects.count()
+        open_tickets = Ticket.objects.filter(status='open').count()
+
+        # Breakdown
+        priority_breakdown = Ticket.objects.values('priority').annotate(count=Count('id'))
+        category_breakdown = Ticket.objects.values('category').annotate(count=Count('id'))
+
+        # Avg per day
+        daily_counts = Ticket.objects.annotate(date=TruncDay('created_at')).values('date').annotate(count=Count('id')).aggregate(avg=Avg('count'))
+        avg_tickets_per_day = daily_counts['avg'] or 0
+
+        # Format breakdowns into dicts
+        p_data = {item['priority']: item['count'] for item in priority_breakdown}
+        c_data = {item['category']: item['count'] for item in category_breakdown}
+
+        return Response({
+            "total_tickets": total_tickets,
+            "open_tickets": open_tickets,
+            "avg_tickets_per_day": round(avg_tickets_per_day, 1),
+            "priority_breakdown": p_data,
+            "category_breakdown": c_data
+        })
