@@ -28,6 +28,26 @@ class TicketViewSet(viewsets.ModelViewSet):
 
         return queryset
 
+    @action(detail=False, methods=['post'])
+    def classify(self, request):
+        description = request.data.get('description', '')
+        if not description:
+            return Response({"error": "Description is required"}, status=status.HTTP_400_BAD_REQUEST)
+
+        try:
+            from .llm_service import classify_ticket
+            result = classify_ticket(description)
+            return Response({
+                "suggested_category": result['category'],
+                "suggested_priority": result['priority']
+            })
+        except Exception as e:
+            # Fallback
+            return Response({
+                "suggested_category": "general",
+                "suggested_priority": "medium"
+            })
+
     @action(detail=False, methods=['get'])
     def stats(self, request):
         total_tickets = Ticket.objects.count()
